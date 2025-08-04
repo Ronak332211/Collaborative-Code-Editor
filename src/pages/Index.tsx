@@ -1,9 +1,12 @@
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Code, Users, Zap, Shield } from "lucide-react";
-import { Link } from "react-router-dom";
 
 const Index = () => {
+  const handleNavigation = (path: string) => {
+    window.location.href = path;
+  };
+
   return (
     <div className="min-h-screen bg-background">
       {/* Hero Section */}
@@ -20,11 +23,20 @@ const Index = () => {
               Real-time collaborative code editor where teams can write, edit, and debug code together seamlessly
             </p>
             <div className="flex flex-col sm:flex-row gap-4 justify-center">
-              <Button size="lg" asChild className="px-8">
-                <Link to="/login">Get Started</Link>
+              <Button 
+                size="lg" 
+                onClick={() => handleNavigation("/login")}
+                className="px-8"
+              >
+                Get Started
               </Button>
-              <Button variant="outline" size="lg" asChild className="px-8">
-                <Link to="/login">Sign In</Link>
+              <Button 
+                variant="outline" 
+                size="lg"
+                onClick={() => handleNavigation("/login")}
+                className="px-8"
+              >
+                Sign In
               </Button>
             </div>
           </div>
@@ -100,8 +112,12 @@ const Index = () => {
           <p className="text-muted-foreground mb-8 max-w-2xl mx-auto">
             Join thousands of developers who are already using CodeCollab to build amazing projects together
           </p>
-          <Button size="lg" asChild className="px-8">
-            <Link to="/login">Create Your First Session</Link>
+          <Button 
+            size="lg" 
+            onClick={() => handleNavigation("/login")}
+            className="px-8"
+          >
+            Create Your First Session
           </Button>
         </div>
       </div>
