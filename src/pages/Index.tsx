@@ -1,11 +1,10 @@
+import { useNavigate } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Code, Users, Zap, Shield } from "lucide-react";
 
 const Index = () => {
-  const handleNavigation = (path: string) => {
-    window.location.href = path;
-  };
+  const navigate = useNavigate();
 
   return (
     <div className="min-h-screen bg-background">
@@ -25,7 +24,7 @@ const Index = () => {
             <div className="flex flex-col sm:flex-row gap-4 justify-center">
               <Button 
                 size="lg" 
-                onClick={() => handleNavigation("/login")}
+                onClick={() => navigate("/login")}
                 className="px-8"
               >
                 Get Started
@@ -33,7 +32,7 @@ const Index = () => {
               <Button 
                 variant="outline" 
                 size="lg"
-                onClick={() => handleNavigation("/login")}
+                onClick={() => navigate("/login")}
                 className="px-8"
               >
                 Sign In
@@ -114,7 +113,7 @@ const Index = () => {
           </p>
           <Button 
             size="lg" 
-            onClick={() => handleNavigation("/login")}
+            onClick={() => navigate("/login")}
             className="px-8"
           >
             Create Your First Session
