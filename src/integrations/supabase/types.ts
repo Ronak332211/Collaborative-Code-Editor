@@ -14,6 +14,39 @@ export type Database = {
   }
   public: {
     Tables: {
+      coding_sessions: {
+        Row: {
+          code: string | null
+          created_at: string
+          created_by: string
+          id: string
+          language: string | null
+          name: string
+          session_id: string
+          updated_at: string
+        }
+        Insert: {
+          code?: string | null
+          created_at?: string
+          created_by: string
+          id?: string
+          language?: string | null
+          name: string
+          session_id: string
+          updated_at?: string
+        }
+        Update: {
+          code?: string | null
+          created_at?: string
+          created_by?: string
+          id?: string
+          language?: string | null
+          name?: string
+          session_id?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
       profiles: {
         Row: {
           avatar_url: string | null
@@ -38,6 +71,36 @@ export type Database = {
           full_name?: string | null
           id?: string
           updated_at?: string
+        }
+        Relationships: []
+      }
+      session_participants: {
+        Row: {
+          created_at: string
+          id: string
+          last_seen: string
+          session_id: string
+          user_color: string
+          user_id: string
+          user_name: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          last_seen?: string
+          session_id: string
+          user_color: string
+          user_id: string
+          user_name: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          last_seen?: string
+          session_id?: string
+          user_color?: string
+          user_id?: string
+          user_name?: string
         }
         Relationships: []
       }

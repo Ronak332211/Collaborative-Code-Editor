@@ -1,5 +1,7 @@
 import { useState, useEffect } from "react";
 import { useParams, useNavigate } from "react-router-dom";
+import { supabase } from "@/integrations/supabase/client";
+import { useAuth } from "@/hooks/useAuth";
 import { Button } from "@/components/ui/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Badge } from "@/components/ui/badge";
@@ -24,37 +26,189 @@ import {
 const Editor = () => {
   const { sessionId } = useParams();
   const navigate = useNavigate();
+  const { user } = useAuth();
   const [code, setCode] = useState("// Welcome to CodeCollab!\n// Start typing to begin collaborating\n\nconsole.log('Hello, World!');\n");
   const [language, setLanguage] = useState("javascript");
   const [isDarkMode, setIsDarkMode] = useState(true);
   const [isConnected, setIsConnected] = useState(false);
-  const [sessionName] = useState("My Coding Session");
+  const [sessionName, setSessionName] = useState("My Coding Session");
+  const [activeUsers, setActiveUsers] = useState<Array<{
+    id: string;
+    name: string;
+    color: string;
+    isCurrentUser: boolean;
+  }>>([]);
 
-  // Mock active users - will be real Supabase data when connected
-  const activeUsers = [
-    { id: "1", name: "You", color: "#3b82f6", isCurrentUser: true },
-    { id: "2", name: "Alice", color: "#ef4444", isCurrentUser: false },
-    { id: "3", name: "Bob", color: "#10b981", isCurrentUser: false },
-  ];
+  const colors = ["#3b82f6", "#ef4444", "#10b981", "#f59e0b", "#8b5cf6", "#06b6d4"];
+  const getUserColor = (userId: string) => {
+    const hash = userId.split('').reduce((a, b) => {
+      a = ((a << 5) - a) + b.charCodeAt(0);
+      return a & a;
+    }, 0);
+    return colors[Math.abs(hash) % colors.length];
+  };
 
+  // Load session data and connect to realtime
   useEffect(() => {
-    // TODO: Connect to Supabase realtime when available
-    // For now, simulate connection
-    const timer = setTimeout(() => setIsConnected(true), 1000);
-    return () => clearTimeout(timer);
-  }, []);
+    if (!sessionId || !user) return;
+
+    const loadSession = async () => {
+      const { data: session, error } = await supabase
+        .from('coding_sessions')
+        .select('*')
+        .eq('session_id', sessionId)
+        .single();
+
+      if (error) {
+        console.error("Error loading session:", error);
+        return;
+      }
+
+      if (session) {
+        setCode(session.code);
+        setLanguage(session.language);
+        setSessionName(session.name);
+      }
+      setIsConnected(true);
+    };
+
+    const joinSession = async () => {
+      const { error } = await supabase
+        .from('session_participants')
+        .upsert({
+          session_id: sessionId,
+          user_id: user.id,
+          user_name: user.email?.split('@')[0] || 'Anonymous',
+          user_color: getUserColor(user.id),
+          last_seen: new Date().toISOString()
+        });
+
+      if (error) {
+        console.error("Error joining session:", error);
+      }
+    };
+
+    loadSession();
+    joinSession();
+
+    // Set up realtime subscriptions
+    const codeChannel = supabase
+      .channel('coding-session-changes')
+      .on(
+        'postgres_changes',
+        {
+          event: 'UPDATE',
+          schema: 'public',
+          table: 'coding_sessions',
+          filter: `session_id=eq.${sessionId}`
+        },
+        (payload) => {
+          const newSession = payload.new as any;
+          setCode(newSession.code);
+          setLanguage(newSession.language);
+          setSessionName(newSession.name);
+        }
+      )
+      .subscribe();
+
+    const participantsChannel = supabase
+      .channel('session-participants')
+      .on(
+        'postgres_changes',
+        {
+          event: '*',
+          schema: 'public',
+          table: 'session_participants',
+          filter: `session_id=eq.${sessionId}`
+        },
+        () => {
+          loadParticipants();
+        }
+      )
+      .subscribe();
+
+    const loadParticipants = async () => {
+      const { data: participants, error } = await supabase
+        .from('session_participants')
+        .select('*')
+        .eq('session_id', sessionId)
+        .gte('last_seen', new Date(Date.now() - 5 * 60 * 1000).toISOString()); // Active in last 5 minutes
+
+      if (!error && participants) {
+        const users = participants.map(p => ({
+          id: p.user_id,
+          name: p.user_name,
+          color: p.user_color,
+          isCurrentUser: p.user_id === user.id
+        }));
+        setActiveUsers(users);
+      }
+    };
+
+    loadParticipants();
+
+    // Update presence every 30 seconds
+    const presenceInterval = setInterval(() => {
+      supabase
+        .from('session_participants')
+        .update({ last_seen: new Date().toISOString() })
+        .eq('session_id', sessionId)
+        .eq('user_id', user.id);
+    }, 30000);
+
+    return () => {
+      supabase.removeChannel(codeChannel);
+      supabase.removeChannel(participantsChannel);
+      clearInterval(presenceInterval);
+      
+      // Clean up presence on unmount
+      supabase
+        .from('session_participants')
+        .delete()
+        .eq('session_id', sessionId)
+        .eq('user_id', user.id);
+    };
+  }, [sessionId, user]);
 
   const handleCodeChange = (newCode: string) => {
     setCode(newCode);
-    // TODO: Sync with Supabase realtime when connected
+    
+    // Debounce the database update to avoid too many requests
+    clearTimeout((window as any).codeUpdateTimeout);
+    (window as any).codeUpdateTimeout = setTimeout(async () => {
+      if (sessionId) {
+        const { error } = await supabase
+          .from('coding_sessions')
+          .update({ code: newCode })
+          .eq('session_id', sessionId);
+
+        if (error) {
+          console.error("Error updating code:", error);
+        }
+      }
+    }, 1000);
   };
 
-  const handleSave = () => {
-    // TODO: Save to Supabase database when connected
-    toast({
-      title: "Code saved",
-      description: "Your code has been saved successfully",
-    });
+  const handleSave = async () => {
+    if (!sessionId) return;
+    
+    const { error } = await supabase
+      .from('coding_sessions')
+      .update({ code, language })
+      .eq('session_id', sessionId);
+
+    if (error) {
+      toast({
+        title: "Save failed",
+        description: "There was an error saving your code",
+        variant: "destructive",
+      });
+    } else {
+      toast({
+        title: "Code saved",
+        description: "Your code has been saved successfully",
+      });
+    }
   };
 
   const handleShare = () => {

@@ -7,6 +7,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { toast } from "@/hooks/use-toast";
 import { Plus, LogOut, Code } from "lucide-react";
 import { useAuth } from "@/hooks/useAuth";
+import { supabase } from "@/integrations/supabase/client";
 
 const Dashboard = () => {
   const [sessionName, setSessionName] = useState("");
@@ -33,18 +34,43 @@ const Dashboard = () => {
     }
 
     setIsCreating(true);
-    
-    // TODO: Create session in Supabase when connected
-    const mockSessionId = Math.random().toString(36).substring(7);
-    
-    toast({
-      title: "Session created",
-      description: `Session "${sessionName}" created successfully`,
-    });
-    
-    // Navigate to editor with session ID
-    navigate(`/editor/${mockSessionId}`);
-    setIsCreating(false);
+    try {
+      const sessionId = Math.random().toString(36).substring(2, 8);
+      
+      const { error } = await supabase
+        .from('coding_sessions')
+        .insert({
+          session_id: sessionId,
+          name: sessionName,
+          created_by: user?.id
+        });
+
+      if (error) {
+        console.error("Error creating session:", error);
+        toast({
+          title: "Error creating session",
+          description: "There was an error creating your session",
+          variant: "destructive",
+        });
+        return;
+      }
+
+      toast({
+        title: "Session created",
+        description: `Session "${sessionName}" created successfully`,
+      });
+      
+      navigate(`/editor/${sessionId}`);
+    } catch (error) {
+      console.error("Error creating session:", error);
+      toast({
+        title: "Error creating session",
+        description: "There was an error creating your session",
+        variant: "destructive",
+      });
+    } finally {
+      setIsCreating(false);
+    }
   };
 
   const handleJoinSession = () => {
