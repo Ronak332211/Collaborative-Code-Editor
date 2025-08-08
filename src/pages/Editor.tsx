@@ -57,34 +57,70 @@ const Editor = () => {
         .from('coding_sessions')
         .select('*')
         .eq('session_id', sessionId)
-        .single();
+        .maybeSingle();
 
       if (error) {
         console.error("Error loading session:", error);
+        toast({
+          title: "Error loading session",
+          description: "Session not found or you don't have access",
+          variant: "destructive",
+        });
+        navigate("/dashboard");
         return;
       }
 
       if (session) {
-        setCode(session.code);
-        setLanguage(session.language);
-        setSessionName(session.name);
+        setCode(session.code || "// Welcome to CodeCollab!\n// Start typing to begin collaborating\n\nconsole.log('Hello, World!');");
+        setLanguage(session.language || "javascript");
+        setSessionName(session.name || "Coding Session");
+      } else {
+        toast({
+          title: "Session not found",
+          description: "The session you're trying to access doesn't exist",
+          variant: "destructive",
+        });
+        navigate("/dashboard");
+        return;
       }
       setIsConnected(true);
     };
 
     const joinSession = async () => {
-      const { error } = await supabase
+      // First check if user is already a participant
+      const { data: existingParticipant } = await supabase
         .from('session_participants')
-        .upsert({
-          session_id: sessionId,
-          user_id: user.id,
-          user_name: user.email?.split('@')[0] || 'Anonymous',
-          user_color: getUserColor(user.id),
-          last_seen: new Date().toISOString()
-        });
+        .select('id')
+        .eq('session_id', sessionId)
+        .eq('user_id', user.id)
+        .single();
 
-      if (error) {
-        console.error("Error joining session:", error);
+      if (existingParticipant) {
+        // Update last_seen for existing participant
+        const { error } = await supabase
+          .from('session_participants')
+          .update({ last_seen: new Date().toISOString() })
+          .eq('session_id', sessionId)
+          .eq('user_id', user.id);
+
+        if (error) {
+          console.error("Error updating participant:", error);
+        }
+      } else {
+        // Insert new participant
+        const { error } = await supabase
+          .from('session_participants')
+          .insert({
+            session_id: sessionId,
+            user_id: user.id,
+            user_name: user.email?.split('@')[0] || 'Anonymous',
+            user_color: getUserColor(user.id),
+            last_seen: new Date().toISOString()
+          });
+
+        if (error) {
+          console.error("Error joining session:", error);
+        }
       }
     };
 

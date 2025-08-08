@@ -73,7 +73,7 @@ const Dashboard = () => {
     }
   };
 
-  const handleJoinSession = () => {
+  const handleJoinSession = async () => {
     if (!sessionId.trim()) {
       toast({
         title: "Session ID required",
@@ -83,8 +83,32 @@ const Dashboard = () => {
       return;
     }
 
-    // TODO: Validate session exists in Supabase when connected
-    navigate(`/editor/${sessionId}`);
+    try {
+      // Check if session exists
+      const { data: session, error } = await supabase
+        .from('coding_sessions')
+        .select('session_id, name')
+        .eq('session_id', sessionId.trim())
+        .single();
+
+      if (error || !session) {
+        toast({
+          title: "Session not found",
+          description: "Please check the session ID and try again",
+          variant: "destructive",
+        });
+        return;
+      }
+
+      navigate(`/editor/${sessionId.trim()}`);
+    } catch (error) {
+      console.error("Error checking session:", error);
+      toast({
+        title: "Error joining session",
+        description: "There was an error checking the session",
+        variant: "destructive",
+      });
+    }
   };
 
   const handleLogout = async () => {
